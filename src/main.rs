@@ -2,7 +2,7 @@ use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::{
     prelude::*,
     sprite::MaterialMesh2dBundle,
-    window::{close_on_esc, WindowMode},
+    window::{close_on_esc, PresentMode, WindowMode},
 };
 use rand::prelude::*;
 #[derive(Component, PartialEq, Debug)]
@@ -16,9 +16,10 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                mode: WindowMode::BorderlessFullscreen,
+                mode: WindowMode::Windowed,
                 title: "gaming".into(),
-                resolution: (1920., 1080.).into(),
+                present_mode: PresentMode::AutoVsync,
+                resolution: (720., 480.).into(),
                 ..default()
             }),
             ..default()
@@ -100,12 +101,17 @@ fn update(
 
 fn collide(mut query: Query<(&mut Circle, &Transform)>) {
     let mut combo = query.iter_combinations_mut();
-    let mut rng = rand::thread_rng();
     while let Some([(mut circle, transform), (mut other, other_transform)]) = combo.fetch_next() {
-        let pt1 = Vec2::new(transform.translation.x, transform.translation.y);
-        let pt2 = Vec2::new(other_transform.translation.x, other_transform.translation.y);
-        let dist = pt1.distance(pt2);
-        if dist < circle.radius + other.radius {
+        let (x1, y1, x2, y2) = (
+            transform.translation.x,
+            transform.translation.y,
+            other_transform.translation.x,
+            other_transform.translation.y,
+        );
+
+        let dist = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+        let radii_squared = (circle.radius + other.radius) * (circle.radius + other.radius);
+        if dist < radii_squared {
             // let dot = circle.velocity.dot(other.velocity);
             (circle.velocity, other.velocity) = (other.velocity, circle.velocity);
         }
