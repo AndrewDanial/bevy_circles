@@ -24,8 +24,8 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins(LogDiagnosticsPlugin::default())
-        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        // .add_plugins(LogDiagnosticsPlugin::default())
+        // .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, (update, close_on_esc, collide))
         .run();
@@ -50,13 +50,9 @@ fn setup(
         Color::GOLD,
     ];
     let mut rng = rand::thread_rng();
-    for i in 0..25 {
+    for i in 0..50 {
         let radius = rng.gen::<f32>() * 25. + 10.;
-        let transform = Transform::from_translation(Vec3::new(
-            rng.gen_range(-200.0..200.0),
-            rng.gen_range(-200.0..200.0),
-            0.,
-        ));
+        let transform = Transform::from_translation(Vec3::new(0., 0., 0.));
         commands.spawn((
             Circle {
                 radius,
@@ -80,6 +76,8 @@ fn update(
     let window = window.single();
     let width = window.width() / 2.;
     let height = window.height() / 2.;
+
+    // check if circles hit edge of screen
     for (mut circle, mut transform) in &mut query {
         if transform.translation.x >= width - circle.radius
             || transform.translation.x <= -width + circle.radius
@@ -97,23 +95,31 @@ fn update(
         transform.translation.x += circle.velocity.x * time.delta_seconds();
         transform.translation.y += circle.velocity.y * time.delta_seconds();
     }
+    // check if circles hit each other
 }
 
-fn collide(mut query: Query<(&mut Circle, &Transform)>) {
+fn collide(mut query: Query<(&mut Circle, &mut Transform)>) {
     let mut combo = query.iter_combinations_mut();
-    while let Some([(mut circle, transform), (mut other, other_transform)]) = combo.fetch_next() {
+    while let Some([(mut circle1, transform1), (mut circle2, mut transform2)]) = combo.fetch_next()
+    {
         let (x1, y1, x2, y2) = (
-            transform.translation.x,
-            transform.translation.y,
-            other_transform.translation.x,
-            other_transform.translation.y,
+            transform1.translation.x,
+            transform1.translation.y,
+            transform2.translation.x,
+            transform2.translation.y,
         );
 
         let dist = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-        let radii_squared = (circle.radius + other.radius) * (circle.radius + other.radius);
+
+        let radii_squared = (circle1.radius + circle2.radius) * (circle1.radius + circle2.radius);
         if dist < radii_squared {
-            // let dot = circle.velocity.dot(other.velocity);
-            (circle.velocity, other.velocity) = (other.velocity, circle.velocity);
+            let distance_to_move = circle1.radius + circle2.radius - dist.sqrt();
+            let angle = (y2 - y1).atan2(x2 - x1);
+            transform2.translation.x += angle.cos() * distance_to_move;
+            transform2.translation.y += angle.sin() * distance_to_move;
+
+            (circle1.velocity, circle2.velocity) = (circle2.velocity, circle1.velocity);
+            info!("hit");
         }
     }
 }
