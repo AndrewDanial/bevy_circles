@@ -4,8 +4,9 @@ use bevy::{
     sprite::MaterialMesh2dBundle,
     window::{close_on_esc, PresentMode, WindowMode},
 };
+// use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use rand::prelude::*;
-#[derive(Component, PartialEq, Debug)]
+#[derive(Component, PartialEq, Debug, Reflect)]
 struct Circle {
     radius: f32,
     velocity: Vec2,
@@ -18,14 +19,15 @@ fn main() {
             primary_window: Some(Window {
                 mode: WindowMode::Windowed,
                 title: "gaming".into(),
-                present_mode: PresentMode::AutoVsync,
-                resolution: (720., 480.).into(),
+                present_mode: PresentMode::AutoNoVsync,
+                resolution: (1920., 1080.).into(),
                 ..default()
             }),
             ..default()
         }))
-        // .add_plugins(LogDiagnosticsPlugin::default())
-        // .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(LogDiagnosticsPlugin::default())
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        // .add_plugins(WorldInspectorPlugin::new())
         .add_systems(Startup, setup)
         .add_systems(Update, (update, close_on_esc, collide))
         .run();
@@ -50,8 +52,9 @@ fn setup(
         Color::GOLD,
     ];
     let mut rng = rand::thread_rng();
-    for i in 0..50 {
-        let radius = rng.gen::<f32>() * 25. + 10.;
+    for i in 0..1000 {
+        let radius = 1.;
+        // let radius = rng.gen::<f32>() * 25. + 10.;
         let transform = Transform::from_translation(Vec3::new(0., 0., 0.));
         commands.spawn((
             Circle {
@@ -79,14 +82,20 @@ fn update(
 
     // check if circles hit edge of screen
     for (mut circle, mut transform) in &mut query {
-        if transform.translation.x >= width - circle.radius
-            || transform.translation.x <= -width + circle.radius
-        {
+        if transform.translation.x >= width - circle.radius {
+            transform.translation.x = width - circle.radius;
             circle.velocity.x *= -1.;
         }
-        if transform.translation.y >= height - circle.radius
-            || transform.translation.y <= -height + circle.radius
-        {
+        if transform.translation.x < -width + circle.radius {
+            transform.translation.x = -width + circle.radius;
+            circle.velocity.x *= -1.;
+        }
+        if transform.translation.y >= height - circle.radius {
+            transform.translation.y = height - circle.radius;
+            circle.velocity.y *= -1.;
+        }
+        if transform.translation.y < -height + circle.radius {
+            transform.translation.y = -height + circle.radius;
             circle.velocity.y *= -1.;
         }
         circle.velocity.x = circle.velocity.x.clamp(-1000., 1000.);
@@ -100,7 +109,8 @@ fn update(
 
 fn collide(mut query: Query<(&mut Circle, &mut Transform)>) {
     let mut combo = query.iter_combinations_mut();
-    while let Some([(mut circle1, transform1), (mut circle2, mut transform2)]) = combo.fetch_next()
+    while let Some([(mut circle1, mut transform1), (mut circle2, mut transform2)]) =
+        combo.fetch_next()
     {
         let (x1, y1, x2, y2) = (
             transform1.translation.x,
@@ -115,11 +125,12 @@ fn collide(mut query: Query<(&mut Circle, &mut Transform)>) {
         if dist < radii_squared {
             let distance_to_move = circle1.radius + circle2.radius - dist.sqrt();
             let angle = (y2 - y1).atan2(x2 - x1);
+            transform1.translation.x -= angle.cos() * distance_to_move;
+            transform1.translation.y -= angle.sin() * distance_to_move;
             transform2.translation.x += angle.cos() * distance_to_move;
             transform2.translation.y += angle.sin() * distance_to_move;
 
             (circle1.velocity, circle2.velocity) = (circle2.velocity, circle1.velocity);
-            info!("hit");
         }
     }
 }
